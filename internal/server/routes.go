@@ -96,6 +96,9 @@ func SetupRoutes(server *Server, handlers Handlers, client *ent.Client, services
 			handlers.Graphql.Graphql.ServeHTTP(c.Writer, c.Request)
 		})
 
+		adminGroup.GET("/project/storage-policy", middleware.WithTimeout(server.Config.RequestTimeout), handlers.System.GetProjectStoragePolicy)
+		adminGroup.PUT("/project/storage-policy", middleware.WithTimeout(server.Config.RequestTimeout), handlers.System.UpdateProjectStoragePolicy)
+
 		adminGroup.POST("/codex/oauth/start", handlers.Codex.StartOAuth)
 		adminGroup.POST("/codex/oauth/exchange", handlers.Codex.Exchange)
 		adminGroup.POST("/codex/auth/decode", handlers.Codex.DecodeAuthJSON)
