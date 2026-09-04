@@ -14,7 +14,9 @@ import (
 	"go.uber.org/fx"
 
 	"github.com/looplj/axonhub/internal/build"
+	"github.com/looplj/axonhub/internal/contexts"
 	"github.com/looplj/axonhub/internal/log"
+	"github.com/looplj/axonhub/internal/objects"
 	"github.com/looplj/axonhub/internal/server/assets"
 	"github.com/looplj/axonhub/internal/server/biz"
 )
@@ -22,17 +24,20 @@ import (
 type SystemHandlersParams struct {
 	fx.In
 
-	SystemService *biz.SystemService
+	SystemService  *biz.SystemService
+	ProjectService *biz.ProjectService
 }
 
 func NewSystemHandlers(params SystemHandlersParams) *SystemHandlers {
 	return &SystemHandlers{
-		SystemService: params.SystemService,
+		SystemService:  params.SystemService,
+		ProjectService: params.ProjectService,
 	}
 }
 
 type SystemHandlers struct {
-	SystemService *biz.SystemService
+	SystemService  *biz.SystemService
+	ProjectService *biz.ProjectService
 }
 
 // SystemStatusResponse 系统状态响应.
@@ -73,6 +78,13 @@ type WebhookDebugResponse struct {
 	Body    json.RawMessage     `json:"body"`
 }
 
+// ProjectStoragePolicyResponse describes both configured and effective project policy.
+type ProjectStoragePolicyResponse struct {
+	Configured *objects.ProjectStoragePolicy `json:"configured"`
+	Global     *biz.StoragePolicy            `json:"global"`
+	Effective  *biz.StoragePolicy            `json:"effective"`
+}
+
 // GetSystemStatus returns the system initialization status.
 func (h *SystemHandlers) GetSystemStatus(c *gin.Context) {
 	isInitialized, err := h.SystemService.IsInitialized(c.Request.Context())
@@ -96,6 +108,71 @@ func (h *SystemHandlers) Health(c *gin.Context) {
 		Version:   build.Version,
 		Build:     buildInfo,
 		Uptime:    buildInfo.Uptime,
+	})
+}
+
+// GetProjectStoragePolicy returns the selected project's configured and effective policy.
+func (h *SystemHandlers) GetProjectStoragePolicy(c *gin.Context) {
+	ctx := c.Request.Context()
+	projectID, ok := contexts.GetProjectID(ctx)
+	if !ok || projectID == 0 {
+		JSONError(c, http.StatusBadRequest, errors.New("Project is required"))
+		return
+	}
+
+	configured, err := h.ProjectService.GetProjectStoragePolicy(ctx, projectID)
+	if err != nil {
+		JSONError(c, http.StatusForbidden, errors.New("Failed to read project storage policy"))
+		return
+	}
+
+	global, err := h.SystemService.GlobalStoragePolicy(ctx)
+	if err != nil {
+		JSONError(c, http.StatusInternalServerError, errors.New("Failed to read system storage policy"))
+		return
+	}
+
+	c.JSON(http.StatusOK, ProjectStoragePolicyResponse{
+		Configured: configured,
+		Global:     global,
+		Effective:  biz.ApplyProjectStoragePolicy(global, configured),
+	})
+}
+
+// UpdateProjectStoragePolicy updates the selected project's restrictive payload policy.
+func (h *SystemHandlers) UpdateProjectStoragePolicy(c *gin.Context) {
+	ctx := c.Request.Context()
+	projectID, ok := contexts.GetProjectID(ctx)
+	if !ok || projectID == 0 {
+		JSONError(c, http.StatusBadRequest, errors.New("Project is required"))
+		return
+	}
+
+	var policy objects.ProjectStoragePolicy
+	if err := c.ShouldBindJSON(&policy); err != nil {
+		JSONError(c, http.StatusBadRequest, errors.New("Invalid project storage policy"))
+		return
+	}
+
+	if _, err := h.ProjectService.UpdateProjectStoragePolicy(ctx, projectID, policy); err != nil {
+		JSONError(c, http.StatusForbidden, errors.New("Failed to update project storage policy"))
+		return
+	}
+
+	global, err := h.SystemService.GlobalStoragePolicy(ctx)
+	if err != nil {
+		JSONError(c, http.StatusInternalServerError, errors.New("Failed to read system storage policy"))
+		return
+	}
+
+	configured := &policy
+	if policy.IsInherit() {
+		configured = nil
+	}
+	c.JSON(http.StatusOK, ProjectStoragePolicyResponse{
+		Configured: configured,
+		Global:     global,
+		Effective:  biz.ApplyProjectStoragePolicy(global, configured),
 	})
 }
 
@@ -206,24 +283,19 @@ func (h *SystemHandlers) GetFavicon(c *gin.Context) {
 		return
 	}
 
-	// 解析 base64 编码的图片数据
-	// 假设格式为 "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA..."
 	if !strings.HasPrefix(brandLogo, "data:") {
 		JSONError(c, http.StatusBadRequest, errors.New("Invalid brand logo format"))
 		return
 	}
 
-	// 提取 MIME 类型和 base64 数据
 	parts := strings.Split(brandLogo, ",")
 	if len(parts) != 2 {
 		JSONError(c, http.StatusBadRequest, errors.New("Invalid brand logo format"))
 		return
 	}
 
-	// 提取 MIME 类型
-	headerPart := parts[0] // "data:image/png;base64"
+	headerPart := parts[0]
 	mimeStart := strings.Index(headerPart, ":")
-
 	mimeEnd := strings.Index(headerPart, ";")
 	if mimeStart == -1 || mimeEnd == -1 {
 		JSONError(c, http.StatusBadRequest, errors.New("Invalid brand logo format"))
@@ -231,19 +303,14 @@ func (h *SystemHandlers) GetFavicon(c *gin.Context) {
 	}
 
 	mimeType := headerPart[mimeStart+1 : mimeEnd]
-
-	// 解码 base64 数据
 	imageData, err := base64.StdEncoding.DecodeString(parts[1])
 	if err != nil {
 		JSONError(c, http.StatusBadRequest, errors.New("Failed to decode brand logo"))
 		return
 	}
 
-	// 设置响应头
 	c.Header("Content-Type", mimeType)
-	c.Header("Cache-Control", "public, max-age=3600") // 缓存 1 小时
+	c.Header("Cache-Control", "public, max-age=3600")
 	c.Header("Content-Length", fmt.Sprintf("%d", len(imageData)))
-
-	// 返回图片数据
 	c.Data(http.StatusOK, mimeType, imageData)
 }
