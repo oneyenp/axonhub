@@ -83,31 +83,34 @@ export function ProjectStoragePolicyDialog({
     label: string,
     mode: Mode,
     setMode: (mode: Mode) => void,
-    globalEnabled?: boolean,
-    effectiveEnabled?: boolean
-  ) => (
-    <div className='space-y-2 rounded-md border p-3'>
-      <div className='flex items-center justify-between gap-4'>
-        <Label>{label}</Label>
-        <Select value={mode} onValueChange={(value) => setMode(value as Mode)}>
-          <SelectTrigger className='w-[190px]'>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value='inherit'>{t('projects.storagePolicy.mode.inherit')}</SelectItem>
-            <SelectItem value='enabled'>{t('projects.storagePolicy.mode.enabled')}</SelectItem>
-            <SelectItem value='disabled'>{t('projects.storagePolicy.mode.disabled')}</SelectItem>
-          </SelectContent>
-        </Select>
+    globalEnabled?: boolean
+  ) => {
+    const effectiveEnabled = Boolean(globalEnabled) && mode !== 'disabled';
+
+    return (
+      <div className='space-y-2 rounded-md border p-3'>
+        <div className='flex items-center justify-between gap-4'>
+          <Label>{label}</Label>
+          <Select value={mode} onValueChange={(value) => setMode(value as Mode)}>
+            <SelectTrigger className='w-[190px]'>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value='inherit'>{t('projects.storagePolicy.mode.inherit')}</SelectItem>
+              <SelectItem value='enabled'>{t('projects.storagePolicy.mode.enabled')}</SelectItem>
+              <SelectItem value='disabled'>{t('projects.storagePolicy.mode.disabled')}</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <p className='text-xs text-muted-foreground'>
+          {t('projects.storagePolicy.effective', {
+            system: globalEnabled ? t('projects.storagePolicy.on') : t('projects.storagePolicy.off'),
+            effective: effectiveEnabled ? t('projects.storagePolicy.on') : t('projects.storagePolicy.off'),
+          })}
+        </p>
       </div>
-      <p className='text-xs text-muted-foreground'>
-        {t('projects.storagePolicy.effective', {
-          system: globalEnabled ? t('projects.storagePolicy.on') : t('projects.storagePolicy.off'),
-          effective: effectiveEnabled ? t('projects.storagePolicy.on') : t('projects.storagePolicy.off'),
-        })}
-      </p>
-    </div>
-  );
+    );
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -121,7 +124,7 @@ export function ProjectStoragePolicyDialog({
 
         {policyQuery.isLoading ? (
           <div className='py-8 text-center text-sm text-muted-foreground'>
-            {t('common.loading')}
+            {t('projects.storagePolicy.loading')}
           </div>
         ) : policyQuery.isError || !policyQuery.data ? (
           <div className='py-8 text-center text-sm text-destructive'>
@@ -133,22 +136,19 @@ export function ProjectStoragePolicyDialog({
               t('projects.storagePolicy.requestBody'),
               requestMode,
               setRequestMode,
-              policyQuery.data.global.store_request_body,
-              requestMode === 'disabled' ? false : policyQuery.data.global.store_request_body
+              policyQuery.data.global.store_request_body
             )}
             {renderPolicyRow(
               t('projects.storagePolicy.responseBody'),
               responseMode,
               setResponseMode,
-              policyQuery.data.global.store_response_body,
-              responseMode === 'disabled' ? false : policyQuery.data.global.store_response_body
+              policyQuery.data.global.store_response_body
             )}
             {renderPolicyRow(
               t('projects.storagePolicy.chunks'),
               chunksMode,
               setChunksMode,
-              policyQuery.data.global.store_chunks,
-              chunksMode === 'disabled' ? false : policyQuery.data.global.store_chunks
+              policyQuery.data.global.store_chunks
             )}
             <p className='text-xs text-muted-foreground'>
               {t('projects.storagePolicy.restrictiveOnly')}
@@ -164,7 +164,7 @@ export function ProjectStoragePolicyDialog({
             onClick={handleSave}
             disabled={policyQuery.isLoading || policyQuery.isError || updatePolicy.isPending}
           >
-            {updatePolicy.isPending ? t('common.buttons.saving') : t('common.buttons.save')}
+            {updatePolicy.isPending ? t('projects.storagePolicy.saving') : t('common.buttons.save')}
           </Button>
         </DialogFooter>
       </DialogContent>
