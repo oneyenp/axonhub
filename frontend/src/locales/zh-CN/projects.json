@@ -57,5 +57,22 @@
   "projects.profiles.validation.nameRequired": "配置名称不能为空",
   "projects.profiles.validation.atLeastOneProfile": "至少需要一个配置",
   "projects.profiles.errors.updateFailed": "更新项目配置失败",
-  "projects.profiles.messages.updateSuccess": "项目配置已更新"
+  "projects.profiles.messages.updateSuccess": "项目配置已更新",
+  "projects.storagePolicy.title": "存储策略",
+  "projects.storagePolicy.description": "控制项目 {{project}} 的请求和响应 Payload 是否持久化。Trace 元数据、用量、成本和延迟仍会保留。",
+  "projects.storagePolicy.requestBody": "请求正文",
+  "projects.storagePolicy.responseBody": "响应正文",
+  "projects.storagePolicy.chunks": "流式响应分片",
+  "projects.storagePolicy.mode.inherit": "继承系统设置",
+  "projects.storagePolicy.mode.enabled": "启用",
+  "projects.storagePolicy.mode.disabled": "禁用",
+  "projects.storagePolicy.on": "开启",
+  "projects.storagePolicy.off": "关闭",
+  "projects.storagePolicy.effective": "系统：{{system}} · 实际：{{effective}}",
+  "projects.storagePolicy.restrictiveOnly": "项目级设置只能进一步关闭存储，不能重新开启系统已全局关闭的 Payload 存储。",
+  "projects.storagePolicy.loading": "正在加载存储策略...",
+  "projects.storagePolicy.saving": "保存中...",
+  "projects.storagePolicy.errors.loadFailed": "加载项目存储策略失败",
+  "projects.storagePolicy.errors.updateFailed": "更新项目存储策略失败",
+  "projects.storagePolicy.messages.updateSuccess": "项目存储策略已更新"
 }
