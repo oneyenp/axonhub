@@ -57,5 +57,22 @@
   "projects.profiles.validation.nameRequired": "Profile name is required",
   "projects.profiles.validation.atLeastOneProfile": "At least one profile is required",
   "projects.profiles.errors.updateFailed": "Failed to update project profiles",
-  "projects.profiles.messages.updateSuccess": "Project profiles updated successfully"
+  "projects.profiles.messages.updateSuccess": "Project profiles updated successfully",
+  "projects.storagePolicy.title": "Storage Policy",
+  "projects.storagePolicy.description": "Control request and response payload retention for project {{project}}. Trace metadata, usage, cost, and latency remain available.",
+  "projects.storagePolicy.requestBody": "Request body",
+  "projects.storagePolicy.responseBody": "Response body",
+  "projects.storagePolicy.chunks": "Streaming chunks",
+  "projects.storagePolicy.mode.inherit": "Inherit system setting",
+  "projects.storagePolicy.mode.enabled": "Enabled",
+  "projects.storagePolicy.mode.disabled": "Disabled",
+  "projects.storagePolicy.on": "On",
+  "projects.storagePolicy.off": "Off",
+  "projects.storagePolicy.effective": "System: {{system}} · Effective: {{effective}}",
+  "projects.storagePolicy.restrictiveOnly": "Project settings can further disable storage, but cannot re-enable payload storage disabled globally.",
+  "projects.storagePolicy.loading": "Loading storage policy...",
+  "projects.storagePolicy.saving": "Saving...",
+  "projects.storagePolicy.errors.loadFailed": "Failed to load project storage policy",
+  "projects.storagePolicy.errors.updateFailed": "Failed to update project storage policy",
+  "projects.storagePolicy.messages.updateSuccess": "Project storage policy updated successfully"
 }
