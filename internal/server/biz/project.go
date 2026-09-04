@@ -240,6 +240,16 @@ func (s *ProjectService) UpdateProjectProfiles(ctx context.Context, id int, prof
 
 	client := s.entFromContext(ctx)
 
+	// Storage policy is managed independently from routing profiles. Preserve the
+	// existing project override when the profile editor submits its legacy shape.
+	current, err := client.Project.Get(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get project before updating profiles: %w", err)
+	}
+	if current.Profiles != nil {
+		profiles.StoragePolicy = current.Profiles.StoragePolicy
+	}
+
 	proj, err := client.Project.UpdateOneID(id).
 		SetProfiles(&profiles).
 		Save(ctx)
