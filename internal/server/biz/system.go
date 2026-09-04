@@ -31,10 +31,10 @@ const (
 	// SystemKeyInitialized is the key used to store the initialized flag in the system table.
 	SystemKeyInitialized = "system_initialized"
 
-	// SystemKeyVersion is the key for the system version.
+	// SystemKeyVersion is the key used to store the version in the system table.
 	SystemKeyVersion = "system_version"
 
-	// SystemKeySecretKey is the key used to store the secret key.
+	// SystemKeySecretKey is the key used to store the secret key in the system table.
 	//
 	//nolint:gosec // Not a secret.
 	SystemKeySecretKey = "system_jwt_secret_key"
@@ -71,18 +71,23 @@ const (
 	SystemKeyOnboarded = "system_onboarded"
 
 	// SystemKeyModelSettings is the key used to store model-related settings.
+	// The value is JSON-encoded SystemModelSettings struct.
 	SystemKeyModelSettings = "system_model_settings"
 
 	// SystemKeyChannelSettings is the key used to store channel settings.
+	// The value is JSON-encoded SystemChannelSettings struct.
 	SystemKeyChannelSettings = "system_channel_settings"
 
 	// SystemKeyGeneralSettings is the key used to store general settings.
+	// The value is JSON-encoded SystemGeneralSettings struct.
 	SystemKeyGeneralSettings = "system_general_settings"
 
 	// SystemKeyAutoBackupSettings is the key used to store auto backup configuration.
+	// The value is JSON-encoded AutoBackupSettings struct.
 	SystemKeyAutoBackupSettings = "system_auto_backup_settings"
 
 	// SystemKeyVideoStorageSettings is the key used to store video storage settings.
+	// The value is JSON-encoded VideoStorageSettings struct.
 	SystemKeyVideoStorageSettings = "system_video_storage_settings"
 
 	// SystemKeyUserAgentPassThrough is the key used to store the user agent pass-through setting.
@@ -100,10 +105,14 @@ type SystemGeneralSettings struct {
 // VideoStorageSettings represents system settings for persisting generated videos.
 // It is designed to store video artifacts outside the database (fs/s3/gcs/webdav).
 type VideoStorageSettings struct {
-	Enabled             bool `json:"enabled"`
-	DataStorageID       int  `json:"data_storage_id"`
-	ScanIntervalMinutes int  `json:"scan_interval_minutes"`
-	ScanLimit           int  `json:"scan_limit"`
+	// Enabled controls whether to persist generated videos to external storage.
+	Enabled bool `json:"enabled"`
+	// DataStorageID is the target data storage ID for saving video files.
+	DataStorageID int `json:"data_storage_id"`
+	// ScanIntervalMinutes defines how often to scan for completed video requests.
+	ScanIntervalMinutes int `json:"scan_interval_minutes"`
+	// ScanLimit is the max number of requests processed per scan.
+	ScanLimit int `json:"scan_limit"`
 }
 
 // BackupFrequency represents how often automatic backups should run.
@@ -117,16 +126,23 @@ const (
 
 // AutoBackupSettings represents automatic backup configuration.
 type AutoBackupSettings struct {
-	Enabled             bool            `json:"enabled"`
-	Frequency           BackupFrequency `json:"frequency"`
-	DataStorageID       int             `json:"data_storage_id"`
-	IncludeChannels     bool            `json:"include_channels"`
-	IncludeModels       bool            `json:"include_models"`
-	IncludeAPIKeys      bool            `json:"include_api_keys"`
-	IncludeModelPrices  bool            `json:"include_model_prices"`
-	RetentionDays       int             `json:"retention_days"`
-	LastBackupAt        *time.Time      `json:"last_backup_at,omitempty"`
-	LastBackupError     string          `json:"last_backup_error,omitempty"`
+	// Enabled controls whether automatic backup is active
+	Enabled bool `json:"enabled"`
+	// Frequency defines how often backups are created
+	Frequency BackupFrequency `json:"frequency"`
+	// DataStorageID is the ID of the data storage to backup to
+	DataStorageID int `json:"data_storage_id"`
+	// BackupOptions defines what to include in the backup
+	IncludeChannels    bool `json:"include_channels"`
+	IncludeModels      bool `json:"include_models"`
+	IncludeAPIKeys     bool `json:"include_api_keys"`
+	IncludeModelPrices bool `json:"include_model_prices"`
+	// RetentionDays defines how many days to keep backups (0 = keep all)
+	RetentionDays int `json:"retention_days"`
+	// LastBackupAt is the timestamp of the last successful backup
+	LastBackupAt *time.Time `json:"last_backup_at,omitempty"`
+	// LastBackupError is the error message from the last backup attempt (if any)
+	LastBackupError string `json:"last_backup_error,omitempty"`
 }
 
 // StoragePolicy represents the storage policy configuration.
@@ -146,20 +162,32 @@ type CleanupOption struct {
 }
 
 const (
-	LoadBalancerStrategyAdaptive       = "adaptive"
-	LoadBalancerStrategyFailover       = "failover"
+	// LoadBalancerStrategyAdaptive is a dynamic load balancer strategy that adapts to the current load.
+	LoadBalancerStrategyAdaptive = "adaptive"
+
+	// LoadBalancerStrategyFailover is a deterministic load balancer strategy that fails over to the next available channel based on the weight of the channels.
+	LoadBalancerStrategyFailover = "failover"
+
+	// LoadBalancerStrategyCircuitBreaker is a dynamic load balancer strategy that monitors the health of channels and fails over to a backup channel when the primary channel is unhealthy.
 	LoadBalancerStrategyCircuitBreaker = "circuit-breaker"
 )
 
 // RetryPolicy represents the retry policy configuration.
 type RetryPolicy struct {
-	Enabled                 bool               `json:"enabled"`
-	MaxChannelRetries       int                `json:"max_channel_retries"`
-	MaxSingleChannelRetries int                `json:"max_single_channel_retries"`
-	RetryDelayMs            int                `json:"retry_delay_ms"`
-	LoadBalancerStrategy    string             `json:"load_balancer_strategy"`
-	AutoDisableChannel      AutoDisableChannel `json:"auto_disable_channel"`
-	EmptyResponseDetection  bool               `json:"empty_response_detection"`
+	// Enabled controls whether retry policy is active
+	Enabled bool `json:"enabled"`
+	// MaxChannelRetries defines the maximum number of different channels to retry
+	MaxChannelRetries int `json:"max_channel_retries"`
+	// MaxSingleChannelRetries defines the maximum number of retries for a single channel
+	MaxSingleChannelRetries int `json:"max_single_channel_retries"`
+	// RetryDelayMs defines the delay between retries
+	RetryDelayMs int `json:"retry_delay_ms"`
+	// LoadBalancerStrategy defines which channel load balancer strategy to use.
+	LoadBalancerStrategy string `json:"load_balancer_strategy"`
+	// AutoDisableChannel controls whether to auto-disable a channel or API key when it exceeds the maximum number of retries.
+	AutoDisableChannel AutoDisableChannel `json:"auto_disable_channel"`
+	// EmptyResponseDetection controls whether to detect empty streaming responses.
+	EmptyResponseDetection bool `json:"empty_response_detection"`
 }
 
 type AutoDisableChannel struct {
@@ -219,6 +247,7 @@ const (
 
 func (a AutoSyncFrequency) MarshalGQL(w io.Writer) {
 	var s string
+
 	switch a {
 	case AutoSyncFrequencyOneHour:
 		s = "ONE_HOUR"
@@ -229,6 +258,7 @@ func (a AutoSyncFrequency) MarshalGQL(w io.Writer) {
 	default:
 		s = "ONE_HOUR"
 	}
+
 	_, _ = io.WriteString(w, `"`+s+`"`)
 }
 
@@ -237,6 +267,7 @@ func (a *AutoSyncFrequency) UnmarshalGQL(v any) error {
 	if !ok {
 		return fmt.Errorf("AutoSyncFrequency must be a string")
 	}
+
 	switch str {
 	case "ONE_HOUR":
 		*a = AutoSyncFrequencyOneHour
@@ -247,6 +278,7 @@ func (a *AutoSyncFrequency) UnmarshalGQL(v any) error {
 	default:
 		return fmt.Errorf("invalid AutoSyncFrequency: %s", str)
 	}
+
 	return nil
 }
 
@@ -265,8 +297,10 @@ func (a *AutoSyncFrequency) UnmarshalJSON(data []byte) error {
 		default:
 			*a = AutoSyncFrequencyOneHour
 		}
+
 		return nil
 	}
+
 	*a = AutoSyncFrequencyOneHour
 	return nil
 }
@@ -281,6 +315,7 @@ const (
 	ProbeFrequency1Hour ProbeFrequency = "1h"
 )
 
+// ChannelProbeSetting represents the channel probe configuration.
 type ChannelProbeSetting struct {
 	Enabled   bool           `json:"enabled"`
 	Frequency ProbeFrequency `json:"frequency"`
@@ -318,6 +353,7 @@ func (c *ChannelProbeSetting) GetIntervalMinutes() int {
 
 func (p ProbeFrequency) MarshalGQL(w io.Writer) {
 	var s string
+
 	switch p {
 	case ProbeFrequency1Min:
 		s = "ONE_MINUTE"
@@ -330,6 +366,7 @@ func (p ProbeFrequency) MarshalGQL(w io.Writer) {
 	default:
 		s = "ONE_MINUTE"
 	}
+
 	_, _ = io.WriteString(w, `"`+s+`"`)
 }
 
@@ -338,6 +375,7 @@ func (p *ProbeFrequency) UnmarshalGQL(v any) error {
 	if !ok {
 		return fmt.Errorf("ProbeFrequency must be a string")
 	}
+
 	switch str {
 	case "ONE_MINUTE":
 		*p = ProbeFrequency1Min
@@ -350,27 +388,33 @@ func (p *ProbeFrequency) UnmarshalGQL(v any) error {
 	default:
 		return fmt.Errorf("invalid ProbeFrequency: %s", str)
 	}
+
 	return nil
 }
 
 type SystemServiceParams struct {
 	fx.In
+
 	CacheConfig xcache.Config
 	Ent         *ent.Client
 }
 
 func NewSystemService(params SystemServiceParams) *SystemService {
 	return &SystemService{
-		AbstractService: &AbstractService{db: params.Ent},
-		CacheConfig:     params.CacheConfig,
-		Cache:           xcache.NewFromConfig[ent.System](params.CacheConfig),
+		AbstractService: &AbstractService{
+			db: params.Ent,
+		},
+		CacheConfig: params.CacheConfig,
+		Cache:       xcache.NewFromConfig[ent.System](params.CacheConfig),
 	}
 }
 
 type SystemService struct {
 	*AbstractService
+
 	CacheConfig xcache.Config
 	Cache       xcache.Cache[ent.System]
+
 	mu           sync.RWMutex
 	timeLocation *time.Location
 }
@@ -378,13 +422,16 @@ type SystemService struct {
 func (s *SystemService) IsInitialized(ctx context.Context) (bool, error) {
 	ctx = authz.WithSystemBypass(ctx, "system-is-initialized")
 	client := s.entFromContext(ctx)
+
 	sys, err := client.System.Query().Where(system.KeyEQ(SystemKeyInitialized)).Only(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
 			return false, nil
 		}
+
 		return false, err
 	}
+
 	return strings.EqualFold(sys.Value, "true"), nil
 }
 
@@ -403,68 +450,99 @@ func (s *SystemService) Initialize(ctx context.Context, params *InitializeSystem
 	if err != nil {
 		return fmt.Errorf("failed to check initialization status: %w", err)
 	}
+
 	if isInitialized {
 		return nil
 	}
+
 	secretKey, err := GenerateSecretKey()
 	if err != nil {
 		return fmt.Errorf("failed to generate secret key: %w", err)
 	}
+
 	db := s.entFromContext(ctx)
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("failed to start transaction: %w", err)
 	}
+
 	defer func() {
 		if err != nil {
 			_ = tx.Rollback()
 		}
 	}()
+
 	ctx = ent.NewContext(ctx, tx.Client())
 	hashedPassword, err := HashPassword(params.OwnerPassword)
 	if err != nil {
 		return fmt.Errorf("failed to hash password: %w", err)
 	}
+
 	preferLanguage := params.PreferLanguage
 	if preferLanguage == "" {
 		preferLanguage = "en"
 	}
-	user, err := tx.User.Create().SetEmail(params.OwnerEmail).SetPassword(hashedPassword).SetFirstName(params.OwnerFirstName).SetLastName(params.OwnerLastName).SetPreferLanguage(preferLanguage).SetIsOwner(true).SetScopes([]string{"*"}).Save(ctx)
+	user, err := tx.User.Create().
+		SetEmail(params.OwnerEmail).
+		SetPassword(hashedPassword).
+		SetFirstName(params.OwnerFirstName).
+		SetLastName(params.OwnerLastName).
+		SetPreferLanguage(preferLanguage).
+		SetIsOwner(true).
+		SetScopes([]string{"*"}).
+		Save(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to create owner user: %w", err)
 	}
+
 	log.Info(ctx, "created owner user", zap.Int("user_id", user.ID))
 	ctx = contexts.WithUser(ctx, user)
 	projectService := NewProjectService(ProjectServiceParams{})
-	projectInput := ent.CreateProjectInput{Name: "Default", Description: lo.ToPtr("Default project")}
+	projectInput := ent.CreateProjectInput{
+		Name:        "Default",
+		Description: lo.ToPtr("Default project"),
+	}
+
 	_, err = projectService.CreateProject(ctx, projectInput)
 	if err != nil {
 		return fmt.Errorf("failed to create default project: %w", err)
 	}
+
 	log.Info(ctx, "created default project", zap.String("slug", "default"))
-	if err = s.setSystemValue(ctx, SystemKeySecretKey, secretKey); err != nil {
+	if err := s.setSystemValue(ctx, SystemKeySecretKey, secretKey); err != nil {
 		return fmt.Errorf("failed to set secret key: %w", err)
 	}
-	if err = s.setSystemValue(ctx, SystemKeyBrandName, params.BrandName); err != nil {
+	if err := s.setSystemValue(ctx, SystemKeyBrandName, params.BrandName); err != nil {
 		return fmt.Errorf("failed to set brand name: %w", err)
 	}
-	primaryDataStorage, err := tx.DataStorage.Create().SetName("Primary").SetDescription("Primary database storage").SetPrimary(true).SetType("database").SetSettings(&objects.DataStorageSettings{}).SetStatus("active").Save(ctx)
+
+	primaryDataStorage, err := tx.DataStorage.Create().
+		SetName("Primary").
+		SetDescription("Primary database storage").
+		SetPrimary(true).
+		SetType("database").
+		SetSettings(&objects.DataStorageSettings{}).
+		SetStatus("active").
+		Save(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to create primary data storage: %w", err)
 	}
-	if err = s.SetDefaultDataStorageID(ctx, primaryDataStorage.ID); err != nil {
+
+	if err := s.SetDefaultDataStorageID(ctx, primaryDataStorage.ID); err != nil {
 		return fmt.Errorf("failed to set default data storage ID: %w", err)
 	}
+
 	log.Info(ctx, "created primary data storage", zap.Int("data_storage_id", primaryDataStorage.ID))
-	if err = s.setSystemValue(ctx, SystemKeyInitialized, "true"); err != nil {
+	if err := s.setSystemValue(ctx, SystemKeyInitialized, "true"); err != nil {
 		return fmt.Errorf("failed to set initialized flag: %w", err)
 	}
-	if err = s.SetVersion(ctx, build.Version); err != nil {
+	if err := s.SetVersion(ctx, build.Version); err != nil {
 		return fmt.Errorf("failed to set system version: %w", err)
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
+
 	return nil
 }
 
@@ -474,8 +552,10 @@ func (s *SystemService) SecretKey(ctx context.Context) (string, error) {
 		if ent.IsNotFound(err) {
 			return "", fmt.Errorf("%w: secret key not found", ErrSystemNotInitialized)
 		}
+
 		return "", fmt.Errorf("failed to get secret key: %w", err)
 	}
+
 	return value, nil
 }
 
@@ -488,19 +568,23 @@ func (s *SystemService) StoreChunks(ctx context.Context) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("failed to get storage policy: %w", err)
 	}
+
 	return policy.StoreChunks, nil
 }
 
 func (s *SystemService) BrandName(ctx context.Context) (string, error) {
 	ctx = authz.WithSystemBypass(ctx, "system-brand-name")
 	client := s.entFromContext(ctx)
+
 	sys, err := client.System.Query().Where(system.KeyEQ(SystemKeyBrandName)).Only(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
 			return "", nil
 		}
+
 		return "", fmt.Errorf("failed to get brand name: %w", err)
 	}
+
 	return sys.Value, nil
 }
 
@@ -511,13 +595,16 @@ func (s *SystemService) SetBrandName(ctx context.Context, brandName string) erro
 func (s *SystemService) BrandLogo(ctx context.Context) (string, error) {
 	ctx = authz.WithSystemBypass(ctx, "system-brand-logo")
 	client := s.entFromContext(ctx)
+
 	sys, err := client.System.Query().Where(system.KeyEQ(SystemKeyBrandLogo)).Only(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
 			return "", nil
 		}
+
 		return "", fmt.Errorf("failed to get brand logo: %w", err)
 	}
+
 	return sys.Value, nil
 }
 
@@ -530,24 +617,34 @@ func (s *SystemService) getSystemValue(ctx context.Context, key string) (string,
 	if v, err := s.Cache.Get(ctx, cacheKey); err == nil {
 		return v.Value, nil
 	}
+
 	client := s.entFromContext(ctx)
 	sys, err := client.System.Query().Where(system.KeyEQ(key)).Only(ctx)
 	if err != nil {
 		return "", fmt.Errorf("failed to get system value: %w", err)
 	}
+
 	_ = s.Cache.Set(ctx, cacheKey, *sys)
 	return sys.Value, nil
 }
 
 func (s *SystemService) setSystemValue(ctx context.Context, key, value string) error {
 	client := s.entFromContext(ctx)
-	err := client.System.Create().SetKey(key).SetValue(value).OnConflict(sql.ConflictColumns("key")).UpdateNewValues().Exec(ctx)
+
+	err := client.System.Create().
+		SetKey(key).
+		SetValue(value).
+		OnConflict(sql.ConflictColumns("key")).
+		UpdateNewValues().
+		Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to create system setting: %w", err)
 	}
+
 	if err := s.Cache.Delete(ctx, "system:"+key); err != nil {
 		log.Warn(ctx, "failed to invalidate cache", log.String("key", key), log.Cause(err))
 	}
+
 	return nil
 }
 
@@ -558,57 +655,67 @@ func (s *SystemService) GlobalStoragePolicy(ctx context.Context) (*StoragePolicy
 		if ent.IsNotFound(err) {
 			return lo.ToPtr(defaultStoragePolicy), nil
 		}
+
 		return nil, fmt.Errorf("failed to get storage policy: %w", err)
 	}
+
 	var policy StoragePolicy
 	if err := json.Unmarshal([]byte(value), &policy); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal storage policy: %w", err)
 	}
+
 	if !strings.Contains(value, "\"store_request_body\"") {
 		policy.StoreRequestBody = true
 	}
+
 	if !strings.Contains(value, "\"store_response_body\"") {
 		policy.StoreResponseBody = true
 	}
+
 	return &policy, nil
 }
 
-// ApplyProjectStoragePolicy combines the system policy with project-level overrides.
-// Project policy is restrictive-only: it cannot re-enable a system-level disabled setting.
+// ApplyProjectStoragePolicy combines a system policy with project overrides.
+// Project overrides are restrictive-only and cannot re-enable globally disabled storage.
 func ApplyProjectStoragePolicy(systemPolicy *StoragePolicy, projectPolicy *objects.ProjectStoragePolicy) *StoragePolicy {
 	if systemPolicy == nil {
 		systemPolicy = lo.ToPtr(defaultStoragePolicy)
 	}
+
 	effective := *systemPolicy
 	if projectPolicy == nil {
 		return &effective
 	}
+
 	effective.StoreRequestBody = systemPolicy.StoreRequestBody && projectPolicy.AllowsRequestBody()
 	effective.StoreResponseBody = systemPolicy.StoreResponseBody && projectPolicy.AllowsResponseBody()
 	effective.StoreChunks = systemPolicy.StoreChunks && projectPolicy.AllowsChunks()
+
 	return &effective
 }
 
 // StoragePolicy retrieves the effective storage policy for the current request context.
-// If a project is selected, its payload policy is applied on top of the global policy.
 func (s *SystemService) StoragePolicy(ctx context.Context) (*StoragePolicy, error) {
 	policy, err := s.GlobalStoragePolicy(ctx)
 	if err != nil {
 		return nil, err
 	}
+
 	projectID, ok := contexts.GetProjectID(ctx)
 	if !ok || projectID == 0 {
 		return policy, nil
 	}
+
 	lookupCtx := authz.WithSystemBypass(ctx, "project-storage-policy")
-	proj, err := s.entFromContext(lookupCtx).Project.Get(lookupCtx, projectID)
+	project, err := s.entFromContext(lookupCtx).Project.Get(lookupCtx, projectID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get project storage policy: %w", err)
 	}
-	if proj.Profiles == nil {
+	if project.Profiles == nil {
 		return policy, nil
 	}
-	return ApplyProjectStoragePolicy(policy, proj.Profiles.StoragePolicy), nil
+
+	return ApplyProjectStoragePolicy(policy, project.Profiles.StoragePolicy), nil
 }
 
 func (s *SystemService) StoragePolicyOrDefault(ctx context.Context) *StoragePolicy {
@@ -617,9 +724,11 @@ func (s *SystemService) StoragePolicyOrDefault(ctx context.Context) *StoragePoli
 		if ent.IsNotFound(err) {
 			return lo.ToPtr(defaultStoragePolicy)
 		}
+
 		log.Warn(ctx, "failed to get storage policy", log.Cause(err))
 		return lo.ToPtr(defaultStoragePolicy)
 	}
+
 	return policy
 }
 
@@ -628,6 +737,7 @@ func (s *SystemService) SetStoragePolicy(ctx context.Context, policy *StoragePol
 	if err != nil {
 		return fmt.Errorf("failed to marshal storage policy: %w", err)
 	}
+
 	return s.setSystemValue(ctx, SystemKeyStoragePolicy, string(jsonBytes))
 }
 
@@ -637,14 +747,18 @@ func (s *SystemService) RetryPolicy(ctx context.Context) (*RetryPolicy, error) {
 		if ent.IsNotFound(err) {
 			policy := defaultRetryPolicy
 			normalizeRetryPolicy(&policy)
+
 			return &policy, nil
 		}
+
 		return nil, fmt.Errorf("failed to get retry policy: %w", err)
 	}
+
 	var policy RetryPolicy
 	if err := json.Unmarshal([]byte(value), &policy); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal retry policy: %w", err)
 	}
+
 	normalizeRetryPolicy(&policy)
 	return &policy, nil
 }
@@ -655,18 +769,22 @@ func (s *SystemService) RetryPolicyOrDefault(ctx context.Context) *RetryPolicy {
 		if ent.IsNotFound(err) {
 			return lo.ToPtr(defaultRetryPolicy)
 		}
+
 		log.Warn(ctx, "failed to get retry policy", log.Cause(err))
 		return lo.ToPtr(defaultRetryPolicy)
 	}
+
 	return policy
 }
 
 func (s *SystemService) SetRetryPolicy(ctx context.Context, policy *RetryPolicy) error {
 	normalizeRetryPolicy(policy)
+
 	jsonBytes, err := json.Marshal(policy)
 	if err != nil {
 		return fmt.Errorf("failed to marshal retry policy: %w", err)
 	}
+
 	return s.setSystemValue(ctx, SystemKeyRetryPolicy, string(jsonBytes))
 }
 
@@ -674,12 +792,15 @@ func normalizeRetryPolicy(policy *RetryPolicy) {
 	if policy == nil {
 		return
 	}
+
 	if policy.LoadBalancerStrategy == "" {
 		policy.LoadBalancerStrategy = defaultRetryPolicy.LoadBalancerStrategy
 	}
+
 	if policy.LoadBalancerStrategy == "weighted" {
 		policy.LoadBalancerStrategy = LoadBalancerStrategyFailover
 	}
+
 	if policy.AutoDisableChannel.Statuses == nil {
 		policy.AutoDisableChannel.Statuses = []AutoDisableChannelStatus{}
 	}
@@ -689,9 +810,11 @@ func normalizeWebhookNotifierConfig(cfg *WebhookNotifierConfig) {
 	if cfg == nil {
 		return
 	}
+
 	if cfg.Targets == nil {
 		cfg.Targets = []WebhookTarget{}
 	}
+
 	if cfg.Subscriptions == nil {
 		cfg.Subscriptions = []WebhookSubscription{}
 	}
@@ -703,14 +826,18 @@ func (s *SystemService) WebhookNotifierConfig(ctx context.Context) (*WebhookNoti
 		if ent.IsNotFound(err) {
 			cfg := WebhookNotifierConfig{}
 			normalizeWebhookNotifierConfig(&cfg)
+
 			return &cfg, nil
 		}
+
 		return nil, fmt.Errorf("failed to get webhook notifier config: %w", err)
 	}
+
 	var cfg WebhookNotifierConfig
 	if err := json.Unmarshal([]byte(value), &cfg); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal webhook notifier config: %w", err)
 	}
+
 	normalizeWebhookNotifierConfig(&cfg)
 	return &cfg, nil
 }
@@ -719,19 +846,24 @@ func (s *SystemService) WebhookNotifierConfigOrDefault(ctx context.Context) *Web
 	cfg, err := s.WebhookNotifierConfig(ctx)
 	if err != nil {
 		log.Error(ctx, "failed to get webhook notifier config", log.Cause(err))
+
 		defaultCfg := WebhookNotifierConfig{}
 		normalizeWebhookNotifierConfig(&defaultCfg)
+
 		return &defaultCfg
 	}
+
 	return cfg
 }
 
 func (s *SystemService) SetWebhookNotifierConfig(ctx context.Context, cfg *WebhookNotifierConfig) error {
 	normalizeWebhookNotifierConfig(cfg)
+
 	jsonBytes, err := json.Marshal(cfg)
 	if err != nil {
 		return fmt.Errorf("failed to marshal webhook notifier config: %w", err)
 	}
+
 	return s.setSystemValue(ctx, SystemKeyWebhookNotifierConfig, string(jsonBytes))
 }
 
@@ -743,12 +875,15 @@ func (s *SystemService) ModelSettings(ctx context.Context) (*SystemModelSettings
 		if ent.IsNotFound(err) {
 			return lo.ToPtr(defaultModelSettings), nil
 		}
+
 		return nil, fmt.Errorf("failed to get model settings: %w", err)
 	}
+
 	var settings SystemModelSettings
 	if err := json.Unmarshal([]byte(value), &settings); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal model settings: %w", err)
 	}
+
 	return &settings, nil
 }
 
@@ -758,9 +893,11 @@ func (s *SystemService) ModelSettingsOrDefault(ctx context.Context) *SystemModel
 		if ent.IsNotFound(err) {
 			return lo.ToPtr(defaultModelSettings)
 		}
+
 		log.Warn(ctx, "failed to get model settings", log.Cause(err))
 		return lo.ToPtr(defaultModelSettings)
 	}
+
 	return settings
 }
 
@@ -769,6 +906,7 @@ func (s *SystemService) SetModelSettings(ctx context.Context, settings SystemMod
 	if err != nil {
 		return fmt.Errorf("failed to marshal model settings: %w", err)
 	}
+
 	return s.setSystemValue(ctx, SystemKeyModelSettings, string(jsonBytes))
 }
 
@@ -778,20 +916,25 @@ func (s *SystemService) ChannelSetting(ctx context.Context) (*SystemChannelSetti
 		if ent.IsNotFound(err) {
 			return lo.ToPtr(defaultChannelSetting), nil
 		}
+
 		return nil, fmt.Errorf("failed to get channel setting: %w", err)
 	}
+
 	var setting SystemChannelSettings
 	if err := json.Unmarshal([]byte(value), &setting); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal channel setting: %w", err)
 	}
+
 	if setting.AutoSync.Frequency == "" {
 		setting.AutoSync.Frequency = defaultChannelSetting.AutoSync.Frequency
 	}
+
 	switch setting.AutoSync.Frequency {
 	case AutoSyncFrequencyOneHour, AutoSyncFrequencySixHours, AutoSyncFrequencyOneDay:
 	default:
 		setting.AutoSync.Frequency = defaultChannelSetting.AutoSync.Frequency
 	}
+
 	return &setting, nil
 }
 
@@ -801,9 +944,11 @@ func (s *SystemService) ChannelSettingOrDefault(ctx context.Context) *SystemChan
 		if ent.IsNotFound(err) {
 			return lo.ToPtr(defaultChannelSetting)
 		}
+
 		log.Warn(ctx, "failed to get channel setting", log.Cause(err))
 		return lo.ToPtr(defaultChannelSetting)
 	}
+
 	return setting
 }
 
@@ -812,38 +957,47 @@ func (s *SystemService) SetChannelSetting(ctx context.Context, setting SystemCha
 	if err != nil {
 		return fmt.Errorf("failed to marshal channel setting: %w", err)
 	}
+
 	return s.setSystemValue(ctx, SystemKeyChannelSettings, string(jsonBytes))
 }
 
 func (s *SystemService) TimeLocation(ctx context.Context) *time.Location {
 	s.mu.RLock()
+
 	if s.timeLocation != nil {
 		defer s.mu.RUnlock()
 		return s.timeLocation
 	}
+
 	s.mu.RUnlock()
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
 	if s.timeLocation != nil {
 		return s.timeLocation
 	}
+
 	settings, err := s.GeneralSettings(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
 			s.timeLocation = time.UTC
 			return time.UTC
 		}
+
 		log.Warn(ctx, "failed to get general settings", log.Cause(err))
 		return time.UTC
 	}
+
 	if settings.Timezone == "" {
 		s.timeLocation = time.UTC
 		return time.UTC
 	}
+
 	if l, err := time.LoadLocation(settings.Timezone); err == nil {
 		s.timeLocation = l
 		return l
 	}
+
 	s.timeLocation = time.UTC
 	return time.UTC
 }
@@ -854,18 +1008,23 @@ func (s *SystemService) GeneralSettings(ctx context.Context) (*SystemGeneralSett
 		if ent.IsNotFound(err) {
 			return lo.ToPtr(defaultGeneralSettings), nil
 		}
+
 		return nil, fmt.Errorf("failed to get general settings: %w", err)
 	}
+
 	var settings SystemGeneralSettings
 	if err := json.Unmarshal([]byte(value), &settings); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal general settings: %w", err)
 	}
+
 	if settings.CurrencyCode == "" {
 		settings.CurrencyCode = defaultGeneralSettings.CurrencyCode
 	}
+
 	if settings.Timezone == "" {
 		settings.Timezone = defaultGeneralSettings.Timezone
 	}
+
 	return &settings, nil
 }
 
@@ -874,12 +1033,16 @@ func (s *SystemService) SetGeneralSettings(ctx context.Context, settings SystemG
 	if err != nil {
 		return fmt.Errorf("failed to marshal general settings: %w", err)
 	}
-	if err = s.setSystemValue(ctx, SystemKeyGeneralSettings, string(jsonBytes)); err != nil {
+
+	err = s.setSystemValue(ctx, SystemKeyGeneralSettings, string(jsonBytes))
+	if err != nil {
 		return fmt.Errorf("failed to set general settings: %w", err)
 	}
+
 	s.mu.Lock()
 	s.timeLocation = nil
 	s.mu.Unlock()
+
 	return nil
 }
 
@@ -889,12 +1052,15 @@ func (s *SystemService) DefaultDataStorageID(ctx context.Context) (int, error) {
 		if ent.IsNotFound(err) {
 			return 0, nil
 		}
+
 		return 0, fmt.Errorf("failed to get default data storage ID: %w", err)
 	}
+
 	var id int
 	if _, err := fmt.Sscanf(value, "%d", &id); err != nil {
 		return 0, fmt.Errorf("failed to parse default data storage ID: %w", err)
 	}
+
 	return id, nil
 }
 
@@ -908,12 +1074,15 @@ func (s *SystemService) AutoBackupSettings(ctx context.Context) (*AutoBackupSett
 		if ent.IsNotFound(err) {
 			return lo.ToPtr(defaultAutoBackupSettings), nil
 		}
+
 		return nil, fmt.Errorf("failed to get auto backup settings: %w", err)
 	}
+
 	var settings AutoBackupSettings
 	if err := json.Unmarshal([]byte(value), &settings); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal auto backup settings: %w", err)
 	}
+
 	return &settings, nil
 }
 
@@ -922,9 +1091,12 @@ func (s *SystemService) SetAutoBackupSettings(ctx context.Context, settings Auto
 	if err != nil {
 		return fmt.Errorf("failed to marshal auto backup settings: %w", err)
 	}
-	if err = s.setSystemValue(ctx, SystemKeyAutoBackupSettings, string(jsonBytes)); err != nil {
+
+	err = s.setSystemValue(ctx, SystemKeyAutoBackupSettings, string(jsonBytes))
+	if err != nil {
 		return fmt.Errorf("failed to set auto backup settings: %w", err)
 	}
+
 	return nil
 }
 
@@ -934,18 +1106,22 @@ func (s *SystemService) VideoStorageSettings(ctx context.Context) (*VideoStorage
 		if ent.IsNotFound(err) {
 			return lo.ToPtr(defaultVideoStorageSettings), nil
 		}
+
 		return nil, fmt.Errorf("failed to get video storage settings: %w", err)
 	}
+
 	var settings VideoStorageSettings
 	if err := json.Unmarshal([]byte(value), &settings); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal video storage settings: %w", err)
 	}
+
 	if settings.ScanIntervalMinutes <= 0 {
 		settings.ScanIntervalMinutes = defaultVideoStorageSettings.ScanIntervalMinutes
 	}
 	if settings.ScanLimit <= 0 {
 		settings.ScanLimit = defaultVideoStorageSettings.ScanLimit
 	}
+
 	return &settings, nil
 }
 
@@ -956,25 +1132,32 @@ func (s *SystemService) SetVideoStorageSettings(ctx context.Context, settings Vi
 	if settings.ScanLimit <= 0 {
 		settings.ScanLimit = defaultVideoStorageSettings.ScanLimit
 	}
+
 	if settings.Enabled {
 		if settings.DataStorageID == 0 {
 			return fmt.Errorf("data_storage_id is required when video storage is enabled")
 		}
+
 		ds, err := s.entFromContext(ctx).DataStorage.Get(ctx, settings.DataStorageID)
 		if err != nil {
 			return fmt.Errorf("failed to get data storage: %w", err)
 		}
+
 		if ds.Primary || ds.Type == datastorage.TypeDatabase {
 			return fmt.Errorf("video storage must use a non-database data storage")
 		}
 	}
+
 	jsonBytes, err := json.Marshal(settings)
 	if err != nil {
 		return fmt.Errorf("failed to marshal video storage settings: %w", err)
 	}
-	if err = s.setSystemValue(ctx, SystemKeyVideoStorageSettings, string(jsonBytes)); err != nil {
+
+	err = s.setSystemValue(ctx, SystemKeyVideoStorageSettings, string(jsonBytes))
+	if err != nil {
 		return fmt.Errorf("failed to set video storage settings: %w", err)
 	}
+
 	return nil
 }
 
@@ -984,8 +1167,10 @@ func (s *SystemService) UserAgentPassThrough(ctx context.Context) (bool, error) 
 		if ent.IsNotFound(err) {
 			return false, nil
 		}
+
 		return false, fmt.Errorf("failed to get user-agent pass-through: %w", err)
 	}
+
 	return value == "true", nil
 }
 
@@ -994,6 +1179,7 @@ func (s *SystemService) SetUserAgentPassThrough(ctx context.Context, enabled boo
 	if enabled {
 		strValue = "true"
 	}
+
 	return s.setSystemValue(ctx, SystemKeyUserAgentPassThrough, strValue)
 }
 
@@ -1002,7 +1188,9 @@ func (s *SystemService) UpdateAutoBackupLastRun(ctx context.Context, lastError s
 	if err != nil {
 		return err
 	}
+
 	settings.LastBackupAt = lo.ToPtr(xtime.UTCNow())
 	settings.LastBackupError = lastError
+
 	return s.SetAutoBackupSettings(ctx, *settings)
 }
