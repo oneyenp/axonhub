@@ -10,7 +10,7 @@ This work is based on the stable upstream branch `release/v0.9.x`, starting from
 
 `46a85279c5d831a932d808e26b793a05b9167161`
 
-The implementation branch is `checkout` in `oneyenp/axonhub`.
+The implementation branch is `feature/project-storage-policy` in `oneyenp/axonhub`.
 
 ## Design Principles
 
@@ -57,28 +57,19 @@ Conceptually:
 
 ```go
 ProjectStoragePolicy {
-    StoreRequestBody  *bool
-    StoreResponseBody *bool
-    StoreChunks       *bool
+    StoreRequestBody  *bool `json:"store_request_body,omitempty"`
+    StoreResponseBody *bool `json:"store_response_body,omitempty"`
+    StoreChunks       *bool `json:"store_chunks,omitempty"`
 }
 ```
 
-Use optional/nullable values so existing projects inherit the global policy and retain current behavior.
+The field should be optional with an empty/default value that means inherit all system-level settings. Existing projects therefore keep their current behavior after migration.
 
-Required work:
+## Effective Storage Policy Service
 
-- update Ent project schema
-- generate/update migration
-- update generated Ent code
-- expose the policy through GraphQL
-- update project create/update/read paths as needed
-- keep backward compatibility for existing installations
+Introduce one resolver/helper responsible for combining system-level and project-level settings. Request persistence code should not independently query and combine policy fields.
 
-## Effective Storage Policy Resolver
-
-Introduce one centralized resolver/service for project-aware storage decisions.
-
-Conceptual flow:
+Conceptually:
 
 ```text
 System StoragePolicy
@@ -87,142 +78,100 @@ Project StoragePolicy
         |
         v
 EffectiveStoragePolicy
-        |
-        +--> Request persistence
-        +--> RequestExecution persistence
-        +--> Response persistence
-        +--> Streaming chunk persistence
 ```
 
-Request persistence code should no longer independently read only `SystemService.StoragePolicy(ctx)` when deciding whether payload content is stored.
+Project policy can only tighten the global policy:
 
-The resolver should accept the current project ID or derive it from the relevant request/execution object and return the effective policy.
+```go
+effective.StoreRequestBody = system.StoreRequestBody && projectAllowsRequestBody
+effective.StoreResponseBody = system.StoreResponseBody && projectAllowsResponseBody
+effective.StoreChunks = system.StoreChunks && projectAllowsChunks
+```
 
-This avoids inconsistent behavior where one persistence path honors the project policy while another does not.
+The effective policy should be resolved once per relevant request flow where practical and reused through context/service helpers. Project-policy caches must be invalidated immediately after project policy changes.
 
-## Request Body Persistence
+## Request Persistence
 
-Update `RequestService.CreateRequest()` so project policy controls request-body persistence.
+Update `RequestService.CreateRequest` to use the effective project policy.
 
-When request-body retention is disabled:
+When request body retention is disabled:
 
-- the upstream provider request must still function normally
-- request metadata must still be created
-- original request content must not be persisted to the database
-- original request content must not be written to S3, filesystem, WebDAV, or other external storage
-- sensitive request headers must not be retained as part of the payload-retention path
+- request processing and provider forwarding continue normally
+- request metadata remains persisted
+- request body is not serialized solely for trace persistence
+- request body is not written to the database
+- request body is not written to external DataStorage
+- sensitive request headers should follow the same storage gate as the request payload unless existing behavior requires them independently
 
-Do not implement this as a post-write cleanup operation. The body should never be written when retention is disabled.
+The implementation must preserve required schema semantics without using a misleading stored `{}` value as the user-visible indication that the actual request was empty.
 
-## RequestExecution Persistence
+## Request Execution Persistence
 
-Apply the same effective policy to `RequestExecution` records.
+Apply the same effective policy to `RequestExecution` records. This is required because provider/channel execution bodies may otherwise preserve the same sensitive content even when the top-level Request body is disabled.
 
-A project-level disable must cover retry/failover execution payloads as well as the user-facing request record.
+When payload storage is disabled, do not persist:
 
-When request or response retention is disabled, prevent persistence of:
+- execution request body
+- execution response body
+- execution response chunks
 
-- `RequestExecution.request_body`
-- `RequestExecution.response_body`
-- `RequestExecution.response_chunks`
-
-This is necessary because provider execution records can otherwise reconstruct the original prompt/response even if the top-level Request record is hidden.
+Execution metadata, status, channel/model information, errors, timing, retry information, and usage must remain available.
 
 ## Response Persistence
 
-Update all response persistence paths to use the effective project policy, including:
+Update all response completion paths to use the effective project policy, including:
 
-- normal completed requests
-- async task completion/update flows
+- normal synchronous completion
+- asynchronous/polled completion
 - RequestExecution completion
-- retry/failover execution flows
-- any other code path that calls response-body persistence helpers
-
-Audit all relevant `SetResponseBody(...)` and `SaveData(...)` calls.
+- retry/failover execution paths
 
 When response retention is disabled:
 
-- response data must still be forwarded to the client normally
-- status/latency/usage/cost information must still be recorded
-- response content must not be written to database or external storage
+- do not JSON-marshal the response solely for persistence
+- do not write response payload to the database
+- do not create response payload objects in external storage
+- continue persisting status, external ID, latency, first-token latency, reasoning duration, usage, and cost information
 
-## Streaming
+## Streaming Chunks
 
-Streaming behavior requires separate treatment.
+Project policy must apply to persistent streaming chunks independently of live protocol processing.
 
-Distinguish between:
+Disabling chunk retention must not break:
 
-1. transient runtime buffering required to proxy/transform the stream
-2. persistent storage of chunks
+- SSE forwarding
+- protocol conversion
+- first-token latency measurement
+- token accounting
+- live request execution
 
-Disabling storage must not break the streaming protocol or prevent live forwarding.
+If runtime chunk buffering is required for protocol behavior, it may continue in memory, but persistent chunk serialization and DataStorage/DB writes must be skipped when the effective project policy disables chunks.
 
-Conceptual flow:
+## Trace Behavior
+
+Do not disable Trace or Request record creation merely because payload retention is disabled.
+
+A metadata-only project should still expose the trace hierarchy and operational information:
 
 ```text
-Provider stream
-     |
-     +--> forward to client              unchanged
-     +--> runtime protocol conversion    allowed in memory
-     +--> latency/usage accounting       unchanged
-     +--> persistent chunks
-                |
-          EffectiveStoragePolicy
-                |
-             disabled --> discard
+Trace
+  Request
+    model
+    channel
+    status
+    latency
+    usage/cost
+    request body: not retained
+    response body: not retained
 ```
 
-Update `SaveRequestExecutionChunks` and any top-level request chunk persistence path so project policy is enforced before persistence.
-
-## Trace and Observability
-
-Do not disable Trace records merely because payload retention is disabled.
-
-Trace should remain usable for request topology and operational debugging while payload content is unavailable.
-
-Expected retained information includes:
-
-- trace/thread relationships
-- request/execution IDs
-- project/model/channel relationships
-- status
-- retry/failover topology
-- latency metrics
-- token/usage accounting
-- cost information
-- timestamps
-
-Expected non-retained information includes prompt/response payloads covered by the project policy.
-
-## External Data Storage
-
-The policy must apply equally to primary database storage and non-primary storage backends.
-
-Current object paths include request/response and execution payload objects under project/request directories.
-
-When retention is disabled, no corresponding payload object/file should be created in:
-
-- S3-compatible storage
-- local filesystem storage
-- WebDAV
-- other configured external `DataStorage` backends
-
-This must be verified by tests and not left to later garbage collection.
+The Trace entity itself should not require structural changes unless needed to surface payload-retention state.
 
 ## API and UI Semantics
 
-The UI and API must distinguish between:
+Expose project storage policy through the existing Project GraphQL/API path and project settings UI.
 
-- actual empty JSON content
-- payload not retained due to policy
-- payload stored externally
-- payload unavailable/error
-
-Do not rely on `{}` alone to represent "not retained" because that is ambiguous.
-
-Prefer the smallest compatible change that provides an explicit state to the frontend.
-
-Project settings UI should provide controls similar to:
+Suggested UI:
 
 ```text
 Request & Response Storage
@@ -230,111 +179,126 @@ Request & Response Storage
 Request body      [ Inherit system setting ]
 Response body     [ Disabled ]
 Streaming chunks  [ Disabled ]
-
-System:    Enabled
-Project:   Disabled
-Effective: Disabled
 ```
 
-Request detail pages should show a clear message such as:
+Where useful, show both configured and effective values so administrators understand the interaction with the system-wide policy.
 
-`Request body was not retained because this project's storage policy disables it.`
+Request details must distinguish at least:
 
-instead of presenting `{}` or `null` as though it were the actual model payload.
+- content stored
+- content intentionally not retained
+- content stored externally
+- content unavailable due to an error
+
+Do not make an intentionally unretained payload look like a failed load or a genuinely empty `{}` request.
+
+## External Data Storage
+
+Project-level disabling must prevent creation of payload objects for all supported storage backends.
+
+Paths currently shaped like these must not be created for disabled payload types:
+
+```text
+/{project}/requests/{request}/request_body.json
+/{project}/requests/{request}/response_body.json
+/{project}/requests/{request}/response_chunks.json
+/{project}/requests/{request}/executions/{execution}/request_body.json
+/{project}/requests/{request}/executions/{execution}/response_body.json
+/{project}/requests/{request}/executions/{execution}/response_chunks.json
+```
+
+This applies to database-primary and external DataStorage configurations.
 
 ## Historical Data
 
-Changing a project from enabled/inherit to disabled affects only new persistence operations.
+Changing a project policy from enabled/inherit to disabled affects new persistence only.
 
-Do not automatically delete already stored payloads.
+It must not automatically delete previously saved payloads. Historical deletion should remain an explicit cleanup/purge operation and can be implemented separately if needed.
 
-Historical purge should remain a separate, explicit action if implemented later.
+## Cleanup and Retention
 
-## Cache and Consistency
+The first implementation does not add project-specific retention days. Existing system cleanup/retention remains unchanged.
 
-If project data is cached, policy updates must invalidate or bypass stale cache entries so a privacy change takes effect immediately for subsequent requests.
+The project policy should be designed so a future project-specific retention setting can be added without changing the effective-policy architecture.
 
-Ensure policy resolution is isolated per project and cannot leak across concurrent requests for different projects.
+## Backend Test Matrix
 
-## Test Matrix
+At minimum test these effective-policy combinations:
 
-At minimum, cover the following effective-policy cases:
+| System | Project | Expected payload storage |
+| --- | --- | --- |
+| enabled | inherit | enabled |
+| enabled | disabled | disabled |
+| enabled | enabled | enabled |
+| disabled | inherit | disabled |
+| disabled | disabled | disabled |
+| disabled | enabled | disabled |
 
-| System | Project | Request Body | Response Body | Chunks |
-| --- | --- | --- | --- | --- |
-| ON | inherit | stored | stored | follows system |
-| ON | OFF | not stored | not stored | not stored |
-| OFF | inherit | not stored | not stored | not stored |
-| OFF | ON | not stored | not stored | not stored |
-
-Additional coverage:
+Test across:
 
 - non-streaming request
 - streaming request
-- provider retry
-- failover across multiple RequestExecutions
-- async response flows
-- completed request
-- failed request
-- canceled request
-- database primary storage
-- external storage
-- Trace still present
-- usage/cost metrics still present
-- latency metrics still present
+- RequestExecution
+- provider retry/failover with multiple executions
+- async completion
+- failed/canceled request paths
+- database storage
+- external DataStorage
 - project isolation
-- project policy cache invalidation
-- UI/API representation for not-retained payloads
-- existing projects default to inherit with unchanged behavior
+- project-policy update/cache invalidation
 
-## Expected Primary Change Areas
+## Regression Requirements
 
-Likely files/modules include:
+Verify that disabling payload retention does not regress:
+
+- trace creation and trace/request relationships
+- usage logs and token accounting
+- cost accounting
+- latency/TTFT/reasoning metrics
+- model/channel routing
+- retry behavior
+- streaming delivery
+- API key/project authorization
+- existing system-wide StoragePolicy behavior
+
+Existing projects with no project override must behave exactly as before.
+
+## Expected Main Change Areas
+
+Backend:
 
 ```text
 internal/ent/schema/project.go
+internal/objects/*
 internal/server/biz/project.go
 internal/server/biz/request.go
-internal/server/biz/system.go
+internal/server/biz/system.go (only where reusable policy helpers belong)
 internal/server/gql/*
-migrations/*
-frontend/src/features/projects/*
-frontend/src/features/requests/*
-i18n resources
-request/execution/storage tests
+internal/server/gc/* (regression verification; no new project retention in v1)
 ```
 
-`internal/server/biz/request.go` is expected to remain the main persistence integration point because request, response, RequestExecution, external storage, and streaming chunk persistence already pass through this service in the stable branch.
+Frontend:
 
-## Implementation Order
+```text
+frontend/src/features/projects/data/*
+frontend/src/features/projects/components/*
+frontend/src/features/requests/components/*
+i18n resources
+```
 
-1. Add project policy data model and migration.
-2. Add GraphQL/backend project policy access.
-3. Implement centralized effective-policy resolution.
-4. Wire request-body persistence to the effective policy.
-5. Wire RequestExecution request/response persistence to the effective policy.
-6. Wire normal/async response persistence to the effective policy.
-7. Wire streaming chunk persistence to the effective policy.
-8. Audit all persistence calls for bypass paths.
-9. Add explicit API/frontend not-retained semantics.
-10. Add project settings UI.
-11. Add backend and frontend tests.
-12. Run generation, lint, unit tests, and relevant integration tests.
+Generated Ent/GraphQL artifacts and schema migrations must be regenerated according to repository conventions.
 
 ## Acceptance Criteria
 
-The change is complete when all of the following are true:
+The implementation is complete when all of the following are true:
 
-- a project can disable request-body retention
-- a project can disable response-body retention
-- a project can disable streaming-chunk retention
-- a project cannot override a system-wide disable
-- disabled payloads are not persisted in DB or external storage
-- provider requests and client responses continue to function normally
-- streaming continues to function normally
-- RequestExecution retry/failover payloads obey the same policy
-- Trace/usage/cost/latency metadata remains available
-- UI clearly indicates when content was intentionally not retained
-- existing projects retain previous behavior after upgrade
-- changing project policy takes effect for subsequent requests without stale-cache leakage
-- no existing historical payload is automatically deleted
+1. A project can independently configure request-body, response-body, and streaming-chunk persistence as inherit/enabled/disabled.
+2. A project cannot re-enable storage that is globally disabled by the system policy.
+3. Metadata-only requests still produce usable Request/Trace/Usage data.
+4. Disabled payloads are written to neither DB nor external DataStorage.
+5. RequestExecution payloads follow the same project policy.
+6. Streaming continues functioning with chunk persistence disabled.
+7. UI clearly communicates configured/effective policy and intentionally unretained payloads.
+8. Existing projects inherit global policy and retain backward-compatible behavior.
+9. Changing policy does not silently delete existing historical payloads.
+10. Automated tests cover the policy matrix and persistence paths.
