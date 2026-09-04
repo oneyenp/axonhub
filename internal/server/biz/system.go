@@ -694,6 +694,20 @@ func ApplyProjectStoragePolicy(systemPolicy *StoragePolicy, projectPolicy *objec
 	return &effective
 }
 
+func projectStoragePolicyFromAPIKey(ctx context.Context, projectID int) (*objects.ProjectStoragePolicy, bool) {
+	apiKey, ok := contexts.GetAPIKey(ctx)
+	if !ok || apiKey == nil || apiKey.Edges.Project == nil || apiKey.Edges.Project.ID != projectID {
+		return nil, false
+	}
+
+	project := apiKey.Edges.Project
+	if project.Profiles == nil {
+		return nil, true
+	}
+
+	return project.Profiles.StoragePolicy, true
+}
+
 // StoragePolicy retrieves the effective storage policy for the current request context.
 func (s *SystemService) StoragePolicy(ctx context.Context) (*StoragePolicy, error) {
 	policy, err := s.GlobalStoragePolicy(ctx)
@@ -706,6 +720,13 @@ func (s *SystemService) StoragePolicy(ctx context.Context) (*StoragePolicy, erro
 		return policy, nil
 	}
 
+	// API-key authentication already resolves and caches the project. Reuse that
+	// project here instead of issuing a second Project.Get for every LLM request.
+	if projectPolicy, resolved := projectStoragePolicyFromAPIKey(ctx, projectID); resolved {
+		return ApplyProjectStoragePolicy(policy, projectPolicy), nil
+	}
+
+	// JWT/admin paths may only carry X-Project-ID, so keep a DB fallback there.
 	lookupCtx := authz.WithSystemBypass(ctx, "project-storage-policy")
 	project, err := s.entFromContext(lookupCtx).Project.Get(lookupCtx, projectID)
 	if err != nil {

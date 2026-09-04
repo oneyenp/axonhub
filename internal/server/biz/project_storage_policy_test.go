@@ -1,10 +1,13 @@
 package biz
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/looplj/axonhub/internal/contexts"
+	"github.com/looplj/axonhub/internal/ent"
 	"github.com/looplj/axonhub/internal/objects"
 )
 
@@ -53,4 +56,37 @@ func TestProjectStoragePolicyInherit(t *testing.T) {
 	require.True(t, (*objects.ProjectStoragePolicy)(nil).IsInherit())
 	require.True(t, (&objects.ProjectStoragePolicy{}).IsInherit())
 	require.False(t, (&objects.ProjectStoragePolicy{StoreRequestBody: storagePolicyBool(false)}).IsInherit())
+}
+
+func TestProjectStoragePolicyFromAPIKey(t *testing.T) {
+	projectID := 42
+	projectPolicy := &objects.ProjectStoragePolicy{
+		StoreRequestBody: storagePolicyBool(false),
+	}
+	apiKey := &ent.APIKey{ProjectID: projectID}
+	apiKey.Edges.Project = &ent.Project{
+		ID:       projectID,
+		Profiles: &objects.ProjectProfiles{StoragePolicy: projectPolicy},
+	}
+
+	ctx := contexts.WithAPIKey(context.Background(), apiKey)
+	got, resolved := projectStoragePolicyFromAPIKey(ctx, projectID)
+
+	require.True(t, resolved)
+	require.Same(t, projectPolicy, got)
+
+	_, resolved = projectStoragePolicyFromAPIKey(ctx, projectID+1)
+	require.False(t, resolved)
+}
+
+func TestProjectStoragePolicyFromAPIKeyInherit(t *testing.T) {
+	projectID := 7
+	apiKey := &ent.APIKey{ProjectID: projectID}
+	apiKey.Edges.Project = &ent.Project{ID: projectID}
+
+	ctx := contexts.WithAPIKey(context.Background(), apiKey)
+	got, resolved := projectStoragePolicyFromAPIKey(ctx, projectID)
+
+	require.True(t, resolved)
+	require.Nil(t, got)
 }

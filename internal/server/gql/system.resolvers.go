@@ -278,7 +278,9 @@ func (r *queryResolver) BrandSettings(ctx context.Context) (*BrandSettings, erro
 
 // StoragePolicy is the resolver for the storagePolicy field.
 func (r *queryResolver) StoragePolicy(ctx context.Context) (*biz.StoragePolicy, error) {
-	return r.systemService.StoragePolicy(ctx)
+	// The system settings page must always expose the configured global policy,
+	// even when X-Project-ID is present in the admin request context.
+	return r.systemService.GlobalStoragePolicy(ctx)
 }
 
 // RetryPolicy is the resolver for the retryPolicy field.
